@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Daniel Sanchez · Console Portfolio</title>
+  <meta name="description" content="Daniel Sanchez" />
+  <meta name="theme-color" content="#00ff66" />
+  <style>
+    :root{
+      --bg:#0a0f0a; --text:#d6ffd6; --dim:#9be3b0; --accent:#00ff66; --accent2:#15d47a; --danger:#ff5c7c;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font: 16px/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      overflow-y: auto; overscroll-behavior: none;
+    }
+    /* Subtle CRT scanlines + glow */
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;
+      background:repeating-linear-gradient(0deg,rgba(255,255,255,.04) 0 1px,transparent 1px 3px);
+      mix-blend-mode:soft-light
+    }
+    .wrap{max-width:980px;margin:0 auto;padding:18px}
+    .bezel{border:2px solid #0f2; border-radius:14px; padding:16px; box-shadow:0 0 24px rgba(0,255,102,.15) inset, 0 0 24px rgba(0,255,102,.08)}
+    .status{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;color:var(--dim)}
+    .led{width:10px;height:10px;border:1px solid var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent);background:radial-gradient(circle at 30% 30%, var(--accent) 0 40%, transparent 60%)}
+    .title{color:var(--accent);font-weight:700}
+
+    .screen{background:#061106; border:1px solid rgba(0,255,102,.25); border-radius:10px; padding:14px; min-height:58vh; box-shadow:0 0 38px rgba(0,255,102,.08) inset}
+    .out{white-space:pre-wrap}
+    .prompt{display:flex;gap:8px;align-items:center;margin-top:12px}
+    .caret{color:var(--accent)}
+    input.cmd{flex:1 1 auto;background:transparent;border:none;color:var(--text);outline:none;font:inherit}
+    .hint{color:var(--dim);font-size:14px;margin-top:8px}
+
+    a{color:var(--accent)}
+    .kbd{display:inline-block;border:1px solid rgba(0,255,102,.4);padding:0 6px;border-radius:6px}
+
+    .table{display:grid;grid-template-columns: 120px 1fr 160px; gap:6px; margin-top:8px}
+    .th{color:var(--accent);font-weight:700}
+    .tag{display:inline-block;border:1px solid rgba(0,255,102,.35);padding:1px 6px;border-radius:6px;margin-right:6px;color:var(--dim)}
+    .danger{color:var(--danger)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="bezel">
+      <div class="status"><span class="led" aria-hidden="true"></span><span class="title">daniel@portfolio</span> <span>v1.0</span> <span id="langBadge" class="kbd">ES</span></div>
+      <div class="screen">
+        <div id="output" class="out" aria-live="polite"></div>
+        <div class="prompt"><span class="caret">$</span><input id="cmd" class="cmd" aria-label="command line" autofocus placeholder="type 'help' / escribe 'help'"/></div>
+        <div class="hint">Try: <span class="kbd">help</span> · <span class="kbd">list</span> · <span class="kbd">filter vr</span> · <span class="kbd">search jam</span> · <span class="kbd">open canva-001</span> · <span class="kbd">lang en</span></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const STATE = { lang: (localStorage.getItem('lang')|| (navigator.language?.startsWith('es')?'es':'en')), filter:'all', search:'' };
+const TXT = {
+  en:{
+    hello:"Welcome. Type 'help' to see commands.",
+    help:`Commands:\n  help                 Show this help\n  lang en|es           Change language\n  about                Show profile\n  contact              Show contact\n  list                 List projects\n  filter <tag|all>     Filter by tag (game, vr, edu, community)\n  search <text>        Search in titles and summaries\n  open <id>            Open project link\n  clear                Clear screen`,
+    about:`I am Daniel Sanchez, Engineer Manager, Unity developer, Educator and IGDA LATAM coordinator. I mentor talent and connect studios, universities and institutions across Latin America.`,
+    contact:`Email: <a href="mailto:info@danielsanchez.work">info@danielsanchez.work</a>  ·  LinkedIn: <a target="_blank" rel="noreferrer noopener" href="https://www.linkedin.com/in/jdanielsancheza/">linkedin</a>  ·  WhatsApp Channel: <a target="_blank" rel="noreferrer noopener" href="https://whatsapp.com/channel/0029Vama62hK5cD8ObNmr22n/">Channel</a>`,
+    listHeader:`ID           TITLE                               TAGS`,
+    notFound:`No matches. Adjust your filter or search.`,
+    opened:(t)=>`Opening: ${t}`,
+  },
+  es:{
+    hello:"Bienvenido. Escribe 'help' para ver comandos.",
+    help:`Comandos:\n  help                 Ayuda\n  lang en|es           Cambiar idioma\n  about                Perfil\n  contact              Contacto\n  list                 Lista proyectos\n  filter <tag|all>     Filtrar por tag (game, vr, edu, community)\n  search <texto>       Buscar en títulos y descripciones\n  open <id>            Abrir enlace de proyecto\n  clear                Limpiar pantalla`,
+    about:`Soy Daniel Sanchez, Manager de ingeniería, desarrollador Unity, Educador y Coordinador de IGDA para LATAM. Nutro talento y conecto estudios, universidades e instituciones en toda América Latina.`,
+    contact:`Correo: <a href="mailto:info@danielsanchez.work">info@danielsanchez.work</a>  ·  LinkedIn: <a target="_blank" rel="noreferrer noopener" href="https://www.linkedin.com/in/jdanielsancheza/">linkedin</a>  ·  WhatsApp Channel: <a target="_blank" rel="noreferrer noopener" href="https://whatsapp.com/channel/0029Vama62hK5cD8ObNmr22n/">Channel</a>`,
+    listHeader:`ID           TÍTULO                              TAGS`,
+    notFound:`Sin resultados. Ajusta el filtro o la búsqueda.`,
+    opened:(t)=>`Abriendo: ${t}`,
+  }
+};
+
+const PROJECTS = [
+  {
+    id:"canva-001",
+    cover:"assets/sample-cover-1.jpg",
+    tags:["game","community"],
+    en:{title:"Marvel Strike Force", summary:"Fast loop prototype focused on game feel and replayability.", link:"https://example.com/project-arcade"},
+    es:{title:"Marvel Strike Force", summary:"Prototipo de bucle corto con foco en sensaciones y rejugabilidad.", link:"https://example.com/proyecto-arcade"}
+  },
+  {
+    id:"vr-edu-001",
+    cover:"assets/sample-cover-2.jpg",
+    tags:["vr","edu"],
+    en:{title:"Alexandria Port of Worlds", summary:"Medical training in VR with voice input.", link:"https://example.com/vr-triage"},
+    es:{title:"Alexandria Port of Worlds", summary:"Entrenamiento médico en VR con entrada por voz.", link:"https://example.com/vr-triage-es"}
+  },
+  {
+    id:"vr-edu-001",
+    cover:"assets/sample-cover-2.jpg",
+    tags:["vr","edu"],
+    en:{title:"VR Triage Trainer", summary:"Medical training in VR with voice input.", link:"https://example.com/vr-triage"},
+    es:{title:"Entrenador de Triaje en VR", summary:"Entrenamiento médico en VR con entrada por voz.", link:"https://example.com/vr-triage-es"}
+  }
+];
+
+const CERTS = [
+  {
+    id:"canva-001",
+    cover:"assets/sample-cover-1.jpg",
+    tags:["game","community"],
+    en:{title:"Unity Certified Instructor", summary:"Fast loop prototype focused on game feel and replayability.", link:"https://example.com/project-arcade"},
+    es:{title:"Marvel Strike Force", summary:"Prototipo de bucle corto con foco en sensaciones y rejugabilidad.", link:"https://example.com/proyecto-arcade"}
+  },
+  {
+    id:"vr-edu-001",
+    cover:"assets/sample-cover-2.jpg",
+    tags:["vr","edu"],
+    en:{title:"Unity Professional Programmer", summary:"Medical training in VR with voice input.", link:"https://example.com/vr-triage"},
+    es:{title:"Alexandria Port of Worlds", summary:"Entrenamiento médico en VR con entrada por voz.", link:"https://example.com/vr-triage-es"}
+  },
+  {
+    id:"vr-edu-001",
+    cover:"assets/sample-cover-2.jpg",
+    tags:["vr","edu"],
+    en:{title:"CISCO Cibersecurity", summary:"Medical training in VR with voice input.", link:"https://example.com/vr-triage"},
+    es:{title:"CISCO Cibersecurity", summary:"Entrenamiento médico en VR con entrada por voz.", link:"https://example.com/vr-triage-es"}
+  },
+  {
+    id:"vr-edu-001",
+    cover:"assets/sample-cover-2.jpg",
+    tags:["vr","edu"],
+    en:{title:"Radio Amateur License", summary:"Medical training in VR with voice input.", link:"https://example.com/vr-triage"},
+    es:{title:"Licencia de Radioaficionado", summary:"Entrenamiento médico en VR con entrada por voz.", link:"https://example.com/vr-triage-es"}
+  }
+];
+
+const $ = (s)=>document.querySelector(s);
+const out = $('#output');
+const input = $('#cmd');
+
+function print(line=""){
+  out.innerHTML += line + "\n";
+  out.scrollTop = out.scrollHeight;
+}
+function clear(){ out.innerHTML = ""; }
+function header(){
+  const t = TXT[STATE.lang];
+  print("# " + (STATE.lang==='en'? 'Daniel Sanchez · Console Portfolio' : 'Console Portfolio'));
+  print(STATE.lang==='en'? `Filter: ${STATE.filter}   Search: ${STATE.search||'-'}`: `Filtro: ${STATE.filter}   Búsqueda: ${STATE.search||'-'}`);
+  print("");
+}
+function list(){
+  const t = TXT[STATE.lang];
+  print(t.listHeader);
+  let count=0;
+  for(const p of PROJECTS){
+    if(!match(p)) continue;
+    const title = p[STATE.lang].title.padEnd(35,' ');
+    const id = p.id.padEnd(12,' ');
+    const tags = p.tags.map(x=>`[${x}]`).join(' ');
+    print(`${id} ${title} ${tags}`);
+    count++;
+  }
+  if(count===0) print(t.notFound);
+}
+function match(p){
+  const txt = (p[STATE.lang].title + ' ' + p[STATE.lang].summary + ' ' + p.tags.join(' ')).toLowerCase();
+  const s = (STATE.search||'').toLowerCase();
+  const byText = !s || txt.includes(s);
+  const byFilter = STATE.filter==='all' || p.tags.includes(STATE.filter);
+  return byText && byFilter;
+}
+function openId(id){
+  const p = PROJECTS.find(x=>x.id===id);
+  if(!p){ print(STATE.lang==='en'? `Not found: ${id}` : `No existe: ${id}`); return; }
+  print(TXT[STATE.lang].opened(p[STATE.lang].title));
+  window.open(p[STATE.lang].link || p.en.link || p.es.link, '_blank');
+}
+function setLang(l){
+  STATE.lang = (l==='en')?'en':'es';
+  localStorage.setItem('lang', STATE.lang);
+  $('#langBadge').textContent = STATE.lang.toUpperCase();
+  clear(); header(); print(TXT[STATE.lang].hello);
+}
+
+function boot(){ setLang(STATE.lang); }
+
+function exec(raw){
+  if(!raw) return;
+  const [cmd, ...rest] = raw.trim().split(/\s+/);
+  const arg = rest.join(' ');
+  print(`$ ${raw}`);
+  switch(cmd){
+    case 'help': print(TXT[STATE.lang].help); break;
+    case 'lang': setLang((arg||'').toLowerCase()); break;
+    case 'about': print(TXT[STATE.lang].about); break;
+    case 'contact': print(TXT[STATE.lang].contact); break;
+    case 'list': list(); break;
+    case 'filter': STATE.filter = arg||'all'; list(); break;
+    case 'search': STATE.search = arg||''; list(); break;
+    case 'open': openId(arg); break;
+    case 'clear': clear(); header(); break;
+    default: print((STATE.lang==='en'? 'Unknown command' : 'Comando desconocido')+`: ${cmd}`);
+  }
+}
+
+input.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){
+    exec(input.value);
+    input.value='';
+  }
+});
+
+boot();
+</script>
+</body>
+</html>
